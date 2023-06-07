@@ -1,0 +1,16 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "powerpoint_remote_control", "powerpoint_remote_control\powerpoint_remote_control.csproj", "{285390E1-EEF9-4EEA-AD4D-31BA8E0584A4}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{285390E1-EEF9-4EEA-AD4D-31BA8E0584A4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{285390E1-EEF9-4EEA-AD4D-31BA8E0584A4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{285390E1-EEF9-4EEA-AD4D-31BA8E0584A4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{285390E1-EEF9-4EEA-AD4D-31BA8E0584A4}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
