@@ -2,26 +2,38 @@
 
 ### Description
 
-A Windows application that lets you control a PowerPoint presentation remotely from a mobile device.
-Uses **Redis Pub/Sub** for real-time, low-latency message delivery (sub-millisecond vs ~20s with SQS).
+A Windows application that lets you control a PowerPoint presentation remotely from a mobile device via **Bluetooth**.
+No internet connection, no cloud infrastructure, no accounts — just pair and present.
 
 ## Technologies
 
 - [.NET Framework 4.8.1](https://dotnet.microsoft.com/)
 - [C#](https://docs.microsoft.com/en-us/dotnet/csharp/)
-- [Redis](https://redis.io/) via [StackExchange.Redis](https://github.com/StackExchange/StackExchange.Redis)
+- [InTheHand.Net.Bluetooth (32feet.NET)](https://github.com/inthehand/32feet) — Bluetooth RFCOMM
 - [Microsoft.Office.Interop.PowerPoint](https://docs.microsoft.com/en-us/office/vba/api/overview/powerpoint)
 
-## Why Redis instead of SQS?
+## Architecture
 
-| | SQS (old) | Redis Pub/Sub (new) |
-|---|---|---|
-| Latency | Up to 20 seconds (long polling) | < 1ms (push-based) |
-| Model | Pull (polling) | Push (event-driven) |
-| Infrastructure | AWS account required | Local or Redis Cloud free tier |
-| Cost | Per request pricing | Free self-hosted |
+```
+[Mobile App] --Bluetooth RFCOMM--> [PC: This App] --> [PowerPoint]
+```
+
+The PC acts as a Bluetooth RFCOMM server using the **Serial Port Profile (SPP)** UUID.
+The mobile client pairs with the PC and sends plain-text commands over the Bluetooth socket.
+
+## Why Bluetooth?
+
+| | SQS (original) | Redis Pub/Sub | Bluetooth (current) |
+|---|---|---|---|
+| Latency | Up to 20s | < 1ms | 2–5ms |
+| Internet required | Yes | Yes | **No** |
+| Infrastructure | AWS account | Redis server | **None** |
+| Range | Unlimited | Unlimited | ~10m |
+| Setup | Complex | Moderate | **Pair & go** |
 
 ## Supported Commands
+
+Send these as plain-text lines (terminated with `\n`) over the Bluetooth socket:
 
 | Command | Action |
 |---|---|
@@ -30,35 +42,29 @@ Uses **Redis Pub/Sub** for real-time, low-latency message delivery (sub-millisec
 | `first` | Jump to first slide |
 | `last` | Jump to last slide |
 
-## Environment Variables
+## Bluetooth Service Info
 
-| Variable | Description | Default |
-|---|---|---|
-| `REDIS_CONNECTION_STRING` | Redis connection string | `localhost:6379` |
-| `REDIS_CHANNEL` | Pub/Sub channel name | `powerpoint-control` |
+| Property | Value |
+|---|---|
+| Profile | RFCOMM / Serial Port Profile (SPP) |
+| UUID | `00001101-0000-1000-8000-00805f9b34fb` |
+| Service Name | `PowerPoint Remote Control` |
 
 ## How to Use
 
 1. Clone this repository
-2. Install Redis locally or create a free instance at [Redis Cloud](https://redis.com/try-free/)
-3. Open the solution in Visual Studio
-4. Restore NuGet packages
-5. Build and run the application
-6. Clone the [PowerPoint Remote Control Client](https://github.com/thethiago27/power_point_control_client) and configure it to publish to the same Redis channel
+2. Open the solution in Visual Studio
+3. Restore NuGet packages (`InTheHand.Net.Bluetooth`)
+4. Build and run the application
+5. **Pair** your mobile device with the PC via Windows Bluetooth settings
+6. On the mobile app, connect to the service named **"PowerPoint Remote Control"**
+7. Send commands as plain-text lines over the socket
 
-### Quick Start with Local Redis
+### Testing from another device
 
-```bash
-# Start Redis (Docker)
-docker run -d -p 6379:6379 redis:alpine
-
-# Set environment variables (PowerShell)
-$env:REDIS_CONNECTION_STRING = "localhost:6379"
-$env:REDIS_CHANNEL = "powerpoint-control"
-
-# Run the app, then test from another terminal:
-docker exec -it <container> redis-cli PUBLISH powerpoint-control next
-```
+Any app that can connect to a Bluetooth SPP service works as a client — e.g.:
+- **Android**: "Serial Bluetooth Terminal" (Play Store)
+- **iOS**: "Bluetooth Terminal" apps that support SPP/RFCOMM
 
 ## How to Contribute
 
