@@ -1,50 +1,45 @@
-﻿using System;
-using Amazon;
-using Amazon.SQS;
-using Amazon.SQS.Model;
+using System;
 using System.Threading.Tasks;
+using StackExchange.Redis;
 
 using PowerPoint = Microsoft.Office.Interop.PowerPoint;
 
 namespace powerpoint_remote_control
 {
-  internal class Program
-  {
-      private static async Task Main(string[] args)
+    internal class Program
+    {
+        private static async Task Main(string[] args)
         {
-            var accessKey = Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID");
-            var secretKey = Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY");
-            var region = RegionEndpoint.USEast1;
-            
-            var sqsClient = new AmazonSQSClient(accessKey, secretKey, region);
-            
-            var queueUrl = Environment.GetEnvironmentVariable("SQS_QUEUE_URL");
-            
-            var receiveMessageRequest = new ReceiveMessageRequest(queueUrl);
-            
-            while (true)
+            var redisConnection = Environment.GetEnvironmentVariable("REDIS_CONNECTION_STRING") ?? "localhost:6379";
+            var channel = Environment.GetEnvironmentVariable("REDIS_CHANNEL") ?? "powerpoint-control";
+
+            Console.WriteLine($"Connecting to Redis at {redisConnection}...");
+
+            var redis = await ConnectionMultiplexer.ConnectAsync(redisConnection);
+            var subscriber = redis.GetSubscriber();
+
+            var app = new PowerPoint.Application();
+
+            Console.WriteLine($"Listening on channel '{channel}'. Press Ctrl+C to exit.");
+
+            var exitSignal = new TaskCompletionSource<bool>();
+
+            Console.CancelKeyPress += (s, e) =>
             {
-                
-                var app = new PowerPoint.Application();
+                e.Cancel = true;
+                exitSignal.TrySetResult(true);
+            };
 
-                var receiveRequest = new ReceiveMessageRequest
-                {
-                    QueueUrl = queueUrl,
-                    MaxNumberOfMessages = 1,
-                    WaitTimeSeconds = 20
-                };
-                
-                var receiveResponse = await sqsClient.ReceiveMessageAsync(receiveRequest);
+            await subscriber.SubscribeAsync(RedisChannel.Literal(channel), (ch, message) =>
+            {
+                var command = (string)message;
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] Command received: {command}");
 
-                foreach (var message in receiveResponse.Messages)
+                try
                 {
-                    var body = message.Body;
-                    
-                    Console.WriteLine(body);
-                    
                     var presentation = app.ActivePresentation;
-                    
-                    switch (body)
+
+                    switch (command)
                     {
                         case "next":
                             presentation.SlideShowWindow.View.Next();
@@ -52,20 +47,29 @@ namespace powerpoint_remote_control
                         case "previous":
                             presentation.SlideShowWindow.View.Previous();
                             break;
+                        case "first":
+                            presentation.SlideShowWindow.View.First();
+                            break;
+                        case "last":
+                            presentation.SlideShowWindow.View.Last();
+                            break;
                         default:
-                            Console.WriteLine("Unknown command");
+                            Console.WriteLine($"Unknown command: {command}");
                             break;
                     }
-                    
-                    var deleteRequest = new DeleteMessageRequest
-                    {
-                        QueueUrl = queueUrl,
-                        ReceiptHandle = message.ReceiptHandle
-                    };
-
-                    await sqsClient.DeleteMessageAsync(deleteRequest);
                 }
-            }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error processing command '{command}': {ex.Message}");
+                }
+            });
+
+            await exitSignal.Task;
+
+            await subscriber.UnsubscribeAllAsync();
+            redis.Dispose();
+
+            Console.WriteLine("Disconnected. Goodbye!");
         }
     }
 }
